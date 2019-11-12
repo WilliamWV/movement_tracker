@@ -20,6 +20,8 @@ sigma_color = 50
 # that farther pixels will influence each other as long as their colors
 # are close enough)
 sigma_space = 50
+# Minimum area of a contour that is highlighted
+min_area = 1000
 
 
 def parse_arguments():
@@ -55,6 +57,17 @@ def track_movements(video):
         ret, binary_frame = cv2.threshold (frame_diff, diff_threshold, 255, cv2.THRESH_BINARY)
 
         binary_frame = cv2.dilate(binary_frame, None, iterations = 1)
+        contours = cv2.findContours(binary_frame.copy(), cv2.RETR_EXTERNAL,\
+            cv2.CHAIN_APPROX_SIMPLE)
+        contours = imutils.grab_contours(contours)
+
+        for c in contours:
+            if cv2.contourArea(c) < min_area:
+                continue
+
+            (x, y, w, h) = cv2.boundingRect(c)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
+
 
         cv2.imshow('Camera', frame)
         cv2.imshow('Movements', binary_frame)
