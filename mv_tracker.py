@@ -1,7 +1,3 @@
-# USAGE
-# python motion_detector.py
-# python motion_detector.py --video videos/example_01.mp4
-
 import argparse
 import cv2
 import imutils
@@ -23,6 +19,12 @@ sigma_space = 50
 # Minimum area of a contour that is highlighted
 min_area = 1000
 
+### KEYS ###
+pause_key = 'p'
+next_key = 'd'
+previous_key = 'a'
+
+frames = []
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -32,55 +34,100 @@ def parse_arguments():
     return video
 
 
+def frame_normalization(frame):
+
+    frame = imutils.resize(frame, width=default_width)
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray_frame = cv2.bilateralFilter(gray_frame, neighborhood_size, \
+        sigma_color, sigma_space)
+
+    return frame, gray_frame
+
+
+def process_frame(frame, base_frame):
+    frame, gray_frame = frame_normalization(frame)
+    frame_diff = cv2.absdiff(base_frame, gray_frame)
+    ret, binary_frame = cv2.threshold (frame_diff, diff_threshold, 255, cv2.THRESH_BINARY)
+
+    binary_frame = cv2.dilate(binary_frame, None, iterations = 1)
+    contours = cv2.findContours(binary_frame.copy(), cv2.RETR_EXTERNAL,\
+        cv2.CHAIN_APPROX_SIMPLE)
+    contours = imutils.grab_contours(contours)
+
+    for c in contours:
+        if cv2.contourArea(c) < min_area:
+            continue
+
+        (x, y, w, h) = cv2.boundingRect(c)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
+
+    cv2.imshow('Camera', frame)
+    cv2.imshow('Movements', binary_frame)
+    cv2.imshow('Frame diff', frame_diff)
+    cv2.imshow('Gray frame', gray_frame)
+
+
+def process_pause(video, base_frame, current_frame_index):
+    # Pause
+    global frames
+    paused = True
+    frame_index = current_frame_index
+    while paused:
+        key = cv2.waitKey(0)
+        key = chr(key)
+        if key == previous_key and frame_index > 0:
+            process_frame(frames[frame_index-1], base_frame)
+            frame_index-=1
+        elif key == next_key:
+            if frame_index < current_frame_index:
+                process_frame(frames[frame_index+1], base_frame)
+                frame_index+=1
+            else:
+                valid_frame, frame = video.read()
+                if valid_frame and frame is not None:
+                    frames.append(frame.copy())
+                    process_frame(frame, base_frame)
+                    frame_index+=1
+
+        elif key == pause_key:
+            paused = False
+    return frame_index
+
+
 def track_movements(video):
 
     base_frame = None
+    current_frame_index = 0
 
     while True:
         valid_frame, frame = video.read()
-
         if not valid_frame or frame is None:
             # If the frame is not valid then the video ended
             break
 
-        frame = imutils.resize(frame, width=default_width)
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray_frame = cv2.bilateralFilter(gray_frame, neighborhood_size, \
-            sigma_color, sigma_space)
+        frames.append(frame.copy())
 
-        if base_frame is None:
-            # If the baseFrame was not defined yet, define it.
-            base_frame = gray_frame
+        if base_frame is not None:
+            process_frame(frame, base_frame)
+        else:
+            base_frame = frame_normalization(frame)[1]
             continue
 
-        frame_diff = cv2.absdiff(base_frame, gray_frame)
-        ret, binary_frame = cv2.threshold (frame_diff, diff_threshold, 255, cv2.THRESH_BINARY)
-
-        binary_frame = cv2.dilate(binary_frame, None, iterations = 1)
-        contours = cv2.findContours(binary_frame.copy(), cv2.RETR_EXTERNAL,\
-            cv2.CHAIN_APPROX_SIMPLE)
-        contours = imutils.grab_contours(contours)
-
-        for c in contours:
-            if cv2.contourArea(c) < min_area:
-                continue
-
-            (x, y, w, h) = cv2.boundingRect(c)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
-
-
-        cv2.imshow('Camera', frame)
-        cv2.imshow('Movements', binary_frame)
-        cv2.imshow('Frame diff', frame_diff)
-        cv2.imshow('Gray frame', gray_frame)
         # Wait for 1 ms, this is to detect if the user type something
         key = cv2.waitKey(1)
         if key != -1:
-            if chr(key) == 'p' or chr(key) == 'P':
-                # Pause
-                unpause_key = cv2.waitKey(0)
-                while chr(unpause_key) != 'p' and chr(unpause_key) != 'P':
-                    unpause_key = cv2.waitKey(0)
+            key = chr(key).lower()
+            if key == pause_key:
+                frame_index = process_pause(video, base_frame, current_frame_index)
+                if frame_index < current_frame_index:
+                    while frame_index < current_frame_index:
+                        frame_index+=1
+                        process_frame(frames[frame_index], base_frame)
+                        cv2.waitKey(1)
+                else:
+                    current_frame_index+=frame_index
+
+        current_frame_index +=1
 
 
 
