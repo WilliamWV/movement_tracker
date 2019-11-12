@@ -1,6 +1,7 @@
 import argparse
 import cv2
 import imutils
+import numpy as np
 
 # Value used when thresholding the difference from the current frame to the
 # base frame
@@ -18,6 +19,9 @@ sigma_color = 50
 sigma_space = 50
 # Minimum area of a contour that is highlighted
 min_area = 1000
+# Luminance Value used when converting image to HSV and normalizing V
+# to avoid shaddow detection
+HSV_default_value = 150
 
 ### KEYS ###
 pause_key = 'p'
@@ -37,7 +41,22 @@ def parse_arguments():
 def frame_normalization(frame):
 
     frame = imutils.resize(frame, width=default_width)
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    prev_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    thresh_t = cv2.threshold(prev_gray, 20, 1, cv2.THRESH_BINARY)[1]
+
+    frame[:,:,0] = np.multiply(frame[:,:,0], thresh_t)
+    frame[:,:,1] = np.multiply(frame[:,:,1], thresh_t)
+    frame[:,:,2] = np.multiply(frame[:,:,2], thresh_t)
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+
+    hsv[:,:,2] = np.multiply(HSV_default_value, thresh_t)
+    hsv = cv2.GaussianBlur(hsv, (7, 7), 0)
+    cv2.imshow("HSV", cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR))
+
+    gray_frame = cv2.cvtColor(cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR), cv2.COLOR_BGR2GRAY)
     gray_frame = cv2.bilateralFilter(gray_frame, neighborhood_size, \
         sigma_color, sigma_space)
 
@@ -46,6 +65,7 @@ def frame_normalization(frame):
 
 def process_frame(frame, base_frame):
     frame, gray_frame = frame_normalization(frame)
+
     frame_diff = cv2.absdiff(base_frame, gray_frame)
     ret, binary_frame = cv2.threshold (frame_diff, diff_threshold, 255, cv2.THRESH_BINARY)
 
@@ -88,9 +108,9 @@ def process_pause(video, base_frame, current_frame_index):
                     frames.append(frame.copy())
                     process_frame(frame, base_frame)
                     frame_index+=1
-
         elif key == pause_key:
             paused = False
+
     return frame_index
 
 
