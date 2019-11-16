@@ -27,8 +27,8 @@ HSV_default_value = 150
 pause_key = 'p'
 next_key = 'd'
 previous_key = 'a'
+quit_key = 'q'
 
-frames = []
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -89,29 +89,28 @@ def process_frame(frame, base_frame):
 
 def process_pause(video, base_frame, current_frame_index):
     # Pause
-    global frames
     paused = True
-    frame_index = current_frame_index
+    frame_index = current_frame_index - 1
     while paused:
         key = cv2.waitKey(0)
         key = chr(key)
         if key == previous_key and frame_index > 0:
-            process_frame(frames[frame_index-1], base_frame)
+            video.set(1, frame_index - 1)
+            ans,previous_frame = video.read()
+            process_frame(previous_frame, base_frame)
             frame_index-=1
         elif key == next_key:
-            if frame_index < current_frame_index:
-                process_frame(frames[frame_index+1], base_frame)
+            video.set(1, frame_index + 1)
+            valid_frame,next_frame = video.read()
+            if valid_frame and next_frame is not None:
+                process_frame(next_frame, base_frame)
                 frame_index+=1
-            else:
-                valid_frame, frame = video.read()
-                if valid_frame and frame is not None:
-                    frames.append(frame.copy())
-                    process_frame(frame, base_frame)
-                    frame_index+=1
         elif key == pause_key:
             paused = False
+        elif key == quit_key:
+            exit()
 
-    return frame_index
+    return frame_index + 1
 
 
 def track_movements(video):
@@ -124,8 +123,6 @@ def track_movements(video):
         if not valid_frame or frame is None:
             # If the frame is not valid then the video ended
             break
-
-        frames.append(frame.copy())
 
         if base_frame is not None:
             process_frame(frame, base_frame)
@@ -142,7 +139,8 @@ def track_movements(video):
                 if frame_index < current_frame_index:
                     while frame_index < current_frame_index:
                         frame_index+=1
-                        process_frame(frames[frame_index], base_frame)
+                        ans, curr_frame = video.read()
+                        process_frame(curr_frame, base_frame)
                         cv2.waitKey(1)
                 else:
                     current_frame_index+=frame_index
