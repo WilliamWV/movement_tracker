@@ -24,6 +24,14 @@ min_area = 1000
 # Limit to frame rate
 fps_limit = 30
 
+# Number of frames that a chunk may not contain movement to be considered
+# part of the base frame
+no_move_interval = 30
+# Number of chunks in a line of the image
+chunks_x = 16
+# Number of chunks in a column of the image
+chunks_y = 16
+
 ### KEYS ###
 pause_key = 'p'
 next_key = 'd'
@@ -145,8 +153,37 @@ def process_pause(video, base_frame, current_frame_index):
     return frame_index + 1
 
 
+def update_base_frame(base_frame, old_frame, current_frame):
+    h, w = base_frame.shape
+    chunk_w = int(w / chunks_x)
+    chunk_h = int(h / chunks_y)
+    for i in range(chunks_y):
+        for j in range(chunks_x):
+            x_beg = j * chunk_w
+            y_beg = i * chunk_h
+
+            # Includes possible remainder pixels in the last chunk
+            if i == chunks_y - 1:
+                chunk_h = chunk_h + h % chunks_y
+            if j == chunks_x - 1:
+                chunk_w = chunk_w + w % chunks_x
+
+            old_frame_chunk = old_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w]
+            current_frame_chunk = current_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w]
+            chunks_diff = cv2.absdiff(old_frame_chunk, current_frame_chunk)
+            ret, binary_chunk = cv2.threshold (chunks_diff, diff_threshold, 255, cv2.THRESH_BINARY)
+            white = cv2.countNonZero(binary_chunk)
+
+            if white < 0.05 * chunk_w * chunk_h:
+                # if less than 5% of the pixels changed update this chunk
+                base_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w] = current_frame_chunk
+
+    return base_frame
+
+
 def track_movements(video):
     base_frame = None
+    last_frames = []
     current_frame_index = 0
 
     while True:
@@ -157,11 +194,18 @@ def track_movements(video):
             # If the frame is not valid then the video ended
             break
 
+        normalized_frame = frame_normalization(frame)[1]
+
         if base_frame is not None:
             process_frame(frame, base_frame)
         else:
-            base_frame = frame_normalization(frame)[1]
+            base_frame = normalized_frame
             continue
+
+        last_frames.append(normalized_frame)
+        if current_frame_index >= no_move_interval:
+            base_frame = update_base_frame(base_frame, last_frames[0], normalized_frame)
+            last_frames.remove(last_frames[0])
 
         key = cv2.waitKey(1)
         if key != -1:
