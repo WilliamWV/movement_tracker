@@ -6,7 +6,7 @@ from rect_util import *
 
 # Value used when thresholding the difference from the current frame to the
 # base frame
-diff_threshold = 20
+diff_threshold = 30
 # This value is used to resize the image to a default resolution
 default_width = 480
 # Diameter of the neighborhood of a pixel used on bilateral filter
