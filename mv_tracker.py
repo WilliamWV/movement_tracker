@@ -31,6 +31,8 @@ next_key = 'd'
 previous_key = 'a'
 quit_key = 'q'
 
+backSub = cv2.createBackgroundSubtractorKNN()
+backSub.setDetectShadows(True)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -45,34 +47,38 @@ def frame_normalization(frame):
     frame = imutils.resize(frame, width=default_width)
 
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    #thresh_t = cv2.threshold(prev_gray, 20, 1, cv2.THRESH_BINARY)[1]
-
-    #frame[:,:,0] = np.multiply(frame[:,:,0], thresh_t)
-    #frame[:,:,1] = np.multiply(frame[:,:,1], thresh_t)
-    #frame[:,:,2] = np.multiply(frame[:,:,2], thresh_t)
-
-    #hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-
-    #hsv[:,:,2] = np.multiply(HSV_default_value, thresh_t)
-    #hsv = cv2.GaussianBlur(hsv, (7, 7), 0)
-    #cv2.imshow("HSV", cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR))
-
-    #gray_frame = cv2.cvtColor(cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR), cv2.COLOR_BGR2GRAY)
-    #gray_frame = cv2.bilateralFilter(gray_frame, neighborhood_size, \
-    #    sigma_color, sigma_space)
-
     return frame, gray_frame
+
+
+def non_shadow_rects(rectangles, fgMask):
+
+    filtered = []
+
+    for rectangle in rectangles:
+        (x, y, w, h) = rectangle
+        cropped = fgMask[y:y+h, x:x+w]
+        white = cv2.countNonZero(cropped)
+
+        if white > 0.1 * w * h :
+            filtered.append(rectangle)
+
+    return filtered
 
 
 def process_frame(frame, base_frame):
     frame, gray_frame = frame_normalization(frame)
 
+    fgMask = backSub.apply(frame)
+    ret, fgMask = cv2.threshold (fgMask, 200, 255, cv2.THRESH_BINARY)
+    fgMask = cv2.erode(fgMask, None, iterations = 1)
+    fgMask = cv2.dilate(fgMask, None, iterations = 1)
+
+
     frame_diff = cv2.absdiff(base_frame, gray_frame)
     ret, binary_frame = cv2.threshold (frame_diff, diff_threshold, 255, cv2.THRESH_BINARY)
 
     binary_frame = cv2.erode(binary_frame, None, iterations = 1)
-    binary_frame = cv2.dilate(binary_frame, None, iterations = 1)
+    binary_frame = cv2.dilate(binary_frame, None, iterations = 2)
     contours = cv2.findContours(binary_frame.copy(), cv2.RETR_EXTERNAL,\
         cv2.CHAIN_APPROX_SIMPLE)
     contours = imutils.grab_contours(contours)
@@ -85,12 +91,14 @@ def process_frame(frame, base_frame):
         (x, y, w, h) = cv2.boundingRect(c)
         rectangles.append((x, y, w, h))
 
+    rectangles = non_shadow_rects(rectangles, fgMask)
     rectangles = adjust_rectangles(rectangles)
 
     for rectangle in rectangles:
         (x, y, w, h) = rectangle
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
 
+    cv2.imshow('Fgmask', fgMask)
     cv2.imshow('Camera', frame)
     cv2.imshow('Binary frame', binary_frame)
     cv2.imshow('Frame diff', frame_diff)
@@ -129,7 +137,7 @@ def track_movements(video):
 
     while True:
         valid_frame, frame = video.read()
-        
+
         if not valid_frame or frame is None:
             # If the frame is not valid then the video ended
             break
