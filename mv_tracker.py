@@ -2,6 +2,7 @@ import argparse
 import cv2
 import imutils
 import numpy as np
+import time
 from rect_util import *
 
 # Value used when thresholding the difference from the current frame to the
@@ -20,7 +21,8 @@ sigma_color = 50
 sigma_space = 50
 # Minimum area of a contour that is highlighted
 min_area = 1000
-
+# Limit to frame rate
+fps_limit = 30
 
 ### KEYS ###
 pause_key = 'p'
@@ -148,6 +150,7 @@ def track_movements(video):
     current_frame_index = 0
 
     while True:
+        beginning = time.time()
         valid_frame, frame = video.read()
 
         if not valid_frame or frame is None:
@@ -175,7 +178,8 @@ def track_movements(video):
                     current_frame_index+=frame_index
 
         current_frame_index +=1
-
+        if time.time() - beginning < 1.0/fps_limit:
+            time.sleep(1.0/fps_limit - (time.time() - beginning))
 
 
 if __name__ == '__main__':
