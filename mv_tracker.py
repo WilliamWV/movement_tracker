@@ -34,8 +34,6 @@ chunks_y = 16
 
 ### KEYS ###
 pause_key = 'p'
-next_key = 'd'
-previous_key = 'a'
 quit_key = 'q'
 
 # Background subtractor, used as an auxiliar tool to remove shadows
@@ -133,17 +131,6 @@ def process_pause(video, base_frame, current_frame_index):
     while paused:
         key = cv2.waitKey(0)
         key = chr(key)
-        if key == previous_key and frame_index > 0:
-            video.set(1, frame_index - 1)
-            ans,previous_frame = video.read()
-            process_frame(previous_frame, base_frame)
-            frame_index-=1
-        elif key == next_key:
-            video.set(1, frame_index + 1)
-            valid_frame,next_frame = video.read()
-            if valid_frame and next_frame is not None:
-                process_frame(next_frame, base_frame)
-                frame_index+=1
         elif key == pause_key:
             paused = False
         elif key == quit_key:
