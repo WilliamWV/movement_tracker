@@ -20,13 +20,13 @@ sigma_color = 50
 # are close enough)
 sigma_space = 50
 # Minimum area of a contour that is highlighted
-min_area = 1000
+min_area = 600
 # Limit to frame rate
 fps_limit = 30
 
 # Number of frames that a chunk may not contain movement to be considered
 # part of the base frame
-no_move_interval = 30
+no_move_interval = 60
 # Number of chunks in a line of the image
 chunks_x = 16
 # Number of chunks in a column of the image
@@ -58,7 +58,7 @@ def parse_arguments():
         out_file = base_name + '_' + time.asctime().replace(' ', '-').replace(':', '_') + '.avi'
         width, height = frame_normalized_size(int(video.get(3)), int(video.get(4)))
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        out = cv2.VideoWriter(out_file, fourcc, 20.0, (width, height))
+        out = cv2.VideoWriter(out_file, fourcc, fps_limit, (width, height))
 
     return video, out
 
@@ -170,8 +170,8 @@ def update_base_frame(base_frame, old_frame, current_frame):
             ret, binary_chunk = cv2.threshold (chunks_diff, diff_threshold, 255, cv2.THRESH_BINARY)
             white = cv2.countNonZero(binary_chunk)
 
-            if white < 0.05 * chunk_w * chunk_h:
-                # if less than 5% of the pixels changed update this chunk
+            if white < 0.02 * chunk_w * chunk_h:
+                # if less than 2% of the pixels changed update this chunk
                 base_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w] = current_frame_chunk
 
     return base_frame
@@ -213,8 +213,9 @@ def track_movements(video, out):
 
 
         current_frame_index +=1
-        if time.time() - beginning < 1.0/fps_limit:
-            time.sleep(1.0/fps_limit - (time.time() - beginning))
+        curr_time = time.time()
+        if (curr_time - beginning) < 1.0/fps_limit:
+            time.sleep(1.0/fps_limit - (curr_time - beginning))
 
 
 if __name__ == '__main__':

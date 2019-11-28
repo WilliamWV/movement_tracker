@@ -1,5 +1,5 @@
 # Minimum distance to two detected bounding boxes to be considered differents
-min_rec_dist = 10
+min_rec_dist = 50
 
 def superposition(rec1, rec2):
     (x1, y1, w1, h1) = rec1
