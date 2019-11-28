@@ -48,13 +48,18 @@ def frame_normalized_size(width, height):
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--video', required = True, help='Video file to analize')
+    parser.add_argument('-s', '--save', required = False, type=bool, help='Boolean indicating if the result may be saved')
     args = parser.parse_args()
     video = cv2.VideoCapture(args.video)
-    base_name = args.video.replace('.mp4', '')
-    out_file = base_name + '_' + time.asctime().replace(' ', '-').replace(':', '_') + '.avi'
-    width, height = frame_normalized_size(int(video.get(3)), int(video.get(4)))
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(out_file, fourcc, 20.0, (width, height))
+    out = None
+
+    if args.save is not None and args.save == True:
+        base_name = args.video.replace('.mp4', '')
+        out_file = base_name + '_' + time.asctime().replace(' ', '-').replace(':', '_') + '.avi'
+        width, height = frame_normalized_size(int(video.get(3)), int(video.get(4)))
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        out = cv2.VideoWriter(out_file, fourcc, 20.0, (width, height))
+
     return video, out
 
 
@@ -189,7 +194,8 @@ def track_movements(video, out):
 
         if base_frame is not None:
             processed_frame = process_frame(frame, base_frame)
-            out.write(processed_frame)
+            if out is not None:
+                out.write(processed_frame)
         else:
             base_frame = normalized_frame
             continue
@@ -215,4 +221,5 @@ if __name__ == '__main__':
     video, out = parse_arguments()
     track_movements(video, out)
     video.release()
-    out.release()
+    if out is not None:
+        out.release()
