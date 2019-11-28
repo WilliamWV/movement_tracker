@@ -40,13 +40,22 @@ quit_key = 'q'
 backSub = cv2.createBackgroundSubtractorKNN()
 backSub.setDetectShadows(True)
 
+def frame_normalized_size(width, height):
+    change_rate = default_width / width
+    new_height = change_rate * height
+    return default_width, int(new_height)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--video', required = True, help='Video file to analize')
     args = parser.parse_args()
     video = cv2.VideoCapture(args.video)
-    return video
+    base_name = args.video.replace('.mp4', '')
+    out_file = base_name + '_' + time.asctime().replace(' ', '-').replace(':', '_') + '.avi'
+    width, height = frame_normalized_size(int(video.get(3)), int(video.get(4)))
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(out_file, fourcc, 20.0, (width, height))
+    return video, out
 
 
 def frame_normalization(frame):
@@ -121,23 +130,18 @@ def process_frame(frame, base_frame):
     cv2.imshow('Binary frame', binary_frame)
     cv2.imshow('Frame diff', frame_diff)
     cv2.imshow('Gray frame', gray_frame)
+    return frame
 
 
-def process_pause(video, base_frame, current_frame_index):
+def process_pause():
     paused = True
-    # It is required to decrement this value once the function
-    # VideoCapture.set() considers the next frame
-    frame_index = current_frame_index - 1
     while paused:
         key = cv2.waitKey(0)
         key = chr(key)
-        elif key == pause_key:
+        if key == pause_key:
             paused = False
         elif key == quit_key:
             exit()
-
-    # Increment this value to compensate de decrement done before
-    return frame_index + 1
 
 
 def update_base_frame(base_frame, old_frame, current_frame):
@@ -168,7 +172,7 @@ def update_base_frame(base_frame, old_frame, current_frame):
     return base_frame
 
 
-def track_movements(video):
+def track_movements(video, out):
     base_frame = None
     last_frames = []
     current_frame_index = 0
@@ -184,7 +188,8 @@ def track_movements(video):
         normalized_frame = frame_normalization(frame)[1]
 
         if base_frame is not None:
-            process_frame(frame, base_frame)
+            processed_frame = process_frame(frame, base_frame)
+            out.write(processed_frame)
         else:
             base_frame = normalized_frame
             continue
@@ -198,15 +203,8 @@ def track_movements(video):
         if key != -1:
             key = chr(key).lower()
             if key == pause_key:
-                frame_index = process_pause(video, base_frame, current_frame_index)
-                if frame_index < current_frame_index:
-                    while frame_index < current_frame_index:
-                        frame_index+=1
-                        ans, curr_frame = video.read()
-                        process_frame(curr_frame, base_frame)
-                        cv2.waitKey(1)
-                else:
-                    current_frame_index+=frame_index
+                frame_index = process_pause()
+
 
         current_frame_index +=1
         if time.time() - beginning < 1.0/fps_limit:
@@ -214,5 +212,7 @@ def track_movements(video):
 
 
 if __name__ == '__main__':
-    video = parse_arguments()
-    track_movements(video)
+    video, out = parse_arguments()
+    track_movements(video, out)
+    video.release()
+    out.release()
