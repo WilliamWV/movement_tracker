@@ -32,6 +32,8 @@ chunks_x = 16
 # Number of chunks in a column of the image
 chunks_y = 16
 
+gaussian_mask_dimension = 13
+
 ### KEYS ###
 pause_key = 'p'
 quit_key = 'q'
@@ -102,8 +104,11 @@ def process_frame(frame, base_frame):
     fgMask = cv2.erode(fgMask, None, iterations = 1)
     fgMask = cv2.dilate(fgMask, None, iterations = 1)
 
+    filtered_base_frame = cv2.GaussianBlur(base_frame, (gaussian_mask_dimension, gaussian_mask_dimension), cv2.BORDER_DEFAULT)
+    filtered_gray_frame = cv2.GaussianBlur(gray_frame, (gaussian_mask_dimension, gaussian_mask_dimension), cv2.BORDER_DEFAULT)
+
     # Movement detection
-    frame_diff = cv2.absdiff(base_frame, gray_frame)
+    frame_diff = cv2.absdiff(filtered_base_frame, filtered_gray_frame)
     ret, binary_frame = cv2.threshold (frame_diff, diff_threshold, 255, cv2.THRESH_BINARY)
     binary_frame = cv2.erode(binary_frame, None, iterations = 1)
     binary_frame = cv2.dilate(binary_frame, None, iterations = 2)
@@ -135,6 +140,7 @@ def process_frame(frame, base_frame):
     cv2.imshow('Binary frame', binary_frame)
     cv2.imshow('Frame diff', frame_diff)
     cv2.imshow('Gray frame', gray_frame)
+    cv2.imshow('Base frame', base_frame)
     return frame
 
 
