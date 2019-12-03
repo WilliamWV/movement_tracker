@@ -7,7 +7,7 @@ from rect_util import *
 
 # Value used when thresholding the difference from the current frame to the
 # base frame
-diff_threshold = 15
+diff_threshold = 20
 # This value is used to resize the image to a default resolution
 default_width = 480
 # Diameter of the neighborhood of a pixel used on bilateral filter
@@ -21,9 +21,9 @@ fps_limit = 30
 # part of the base frame
 no_move_interval = 15
 # Number of chunks in a line of the image
-chunks_x = 8
+chunks_x = 16
 # Number of chunks in a column of the image
-chunks_y = 8
+chunks_y = 16
 # Difference area to update base frame
 diff_area = 0.001
 # Threshold used to update base frame
