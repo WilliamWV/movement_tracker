@@ -7,18 +7,11 @@ from rect_util import *
 
 # Value used when thresholding the difference from the current frame to the
 # base frame
-diff_threshold = 30
+diff_threshold = 15
 # This value is used to resize the image to a default resolution
 default_width = 480
 # Diameter of the neighborhood of a pixel used on bilateral filter
 neighborhood_size = 7
-# Sigma color of bilateral filter ( A larger value of the parameter means
-# that farther colors within the pixel neighborhood)
-sigma_color = 50
-# Sigma space of bilateral filter (A larger value of the parameter means
-# that farther pixels will influence each other as long as their colors
-# are close enough)
-sigma_space = 50
 # Minimum area of a contour that is highlighted
 min_area = 600
 # Limit to frame rate
@@ -26,11 +19,18 @@ fps_limit = 30
 
 # Number of frames that a chunk may not contain movement to be considered
 # part of the base frame
-no_move_interval = 60
+no_move_interval = 15
 # Number of chunks in a line of the image
-chunks_x = 16
+chunks_x = 8
 # Number of chunks in a column of the image
-chunks_y = 16
+chunks_y = 8
+# Difference area to update base frame
+diff_area = 0.001
+# Threshold used to update base frame
+diff_base_threshold = 10
+# Area of a rectangle that is marked on both detection mechanisms (color difference)
+# and background extraction
+non_shadow_area = 0.1
 
 gaussian_mask_dimension = 13
 
@@ -89,7 +89,7 @@ def non_shadow_rects(rectangles, fgMask):
         white = cv2.countNonZero(cropped)
         # Only remain those rectangles with more than 10% of its area covered
         # by white pixels
-        if white > 0.1 * w * h :
+        if white > non_shadow_area * w * h :
             filtered.append(rectangle)
 
     return filtered
@@ -173,11 +173,10 @@ def update_base_frame(base_frame, old_frame, current_frame):
             old_frame_chunk = old_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w]
             current_frame_chunk = current_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w]
             chunks_diff = cv2.absdiff(old_frame_chunk, current_frame_chunk)
-            ret, binary_chunk = cv2.threshold (chunks_diff, diff_threshold, 255, cv2.THRESH_BINARY)
+            ret, binary_chunk = cv2.threshold (chunks_diff, diff_base_threshold, 255, cv2.THRESH_BINARY)
             white = cv2.countNonZero(binary_chunk)
 
-            if white < 0.02 * chunk_w * chunk_h:
-                # if less than 2% of the pixels changed update this chunk
+            if white < diff_area * chunk_w * chunk_h:
                 base_frame[y_beg:y_beg+chunk_h, x_beg:x_beg+chunk_w] = current_frame_chunk
 
     return base_frame
